@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+	xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+	xmlns:int-stream="http://www.springframework.org/schema/integration/stream"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/integration/stream http://www.springframework.org/schema/integration/stream/spring-integration-stream.xsd
+		http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<context:property-placeholder />
+
+	<!-- From pipe To RabbitMQ -->
+
+	<bean id="pipeEndPoint"
+		class="org.eu.mmacedo.integration.winnpipes.inbound.WinNamedPipesInboundEndpoint">
+		<property name="pipename" value="${pipename}" />		
+		<property name="outputChannel" ref="toRabbit" />	
+	</bean>	
+
+	<int:channel id="toRabbit" />
+
+	<int-amqp:outbound-channel-adapter
+		channel="toRabbit" amqp-template="amqpTemplate" exchange-name="${rabbitmq.exchange_name}"
+		routing-key="${symbol}" />
+
+	<!-- From RabbitMQ To STDOUT 
+
+	<int-amqp:inbound-channel-adapter channel="fromRabbit"
+		queue-names="live.quote" connection-factory="connectionFactory" />
+-->
+<!-- 
+	<int:channel id="fromRabbit">
+		<int:interceptors>
+			<int:wire-tap channel="loggingChannel" />
+		</int:interceptors>
+	</int:channel>
+
+	<int:transformer input-channel="fromRabbit" output-channel="consoleOut" expression="'Received: ' + payload" />
+
+	<int-stream:stdout-channel-adapter id="consoleOut"
+		append-newline="true" /> -->
+
+	<int:logging-channel-adapter id="loggingChannel" log-full-message="true" logger-name="tapInbound"
+		level="INFO" />
+
+	<!-- Infrastructure -->
+
+	<rabbit:connection-factory id="connectionFactory" host="192.168.122.1" virtual-host="fx" username="fx" password="fx"/>
+
+	<rabbit:template id="amqpTemplate" connection-factory="connectionFactory" />
+
+	<rabbit:admin connection-factory="connectionFactory" />
+
+	<rabbit:queue name="${rabbitmq.queue_name}" durable="true"/>
+
+	<rabbit:fanout-exchange name="${rabbitmq.exchange_name}" durable="true">
+		<rabbit:bindings>
+			<rabbit:binding queue="${rabbitmq.queue_name}"/>
+		</rabbit:bindings>
+	</rabbit:fanout-exchange>
+
+</beans>
